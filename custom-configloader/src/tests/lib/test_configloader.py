@@ -102,12 +102,40 @@ def proj_credentials_env_variable(tmp_path):
     )
 
 
+@pytest.fixture
+def proj_params(tmp_path):
+    base_path = tmp_path / _BASE_ENV / "parameters.yaml"
+    base_params = {
+        "cross_validation": {
+            "max_evals": 128,
+            "grid": {
+                "n_estimators": [250,750,1000,1100],
+                "max_depth": [3,4,5,6],
+                "learning_rate": [0.04,0.06,0.1,0.2],
+                "min_child_weight": [1,3,5,10,15,60],
+            }
+        }
+    }
+
+    run_env_path = tmp_path / _DEFAULT_RUN_ENV / "parameters.yaml"
+    run_env_params = {
+        "cross_validation": {
+            "grid": {
+                "gamma": [0.001,0.01,0.1]
+            }
+        }
+    }
+    _write_yaml(base_path, base_params)
+    _write_yaml(run_env_path, run_env_params)
+
+
 use_config_dir = pytest.mark.usefixtures("create_config_dir")
 use_proj_catalog = pytest.mark.usefixtures("proj_catalog")
 use_credentials_env_variable_yml = pytest.mark.usefixtures(
     "proj_credentials_env_variable"
 )
 use_catalog_env_variable_yml = pytest.mark.usefixtures("proj_catalog_env_variable")
+use_proj_params = pytest.mark.usefixtures("proj_params")
 
 
 class TestOmegaConfLoader:
@@ -449,3 +477,23 @@ class TestOmegaConfLoader:
         os.environ["TEST_KEY"] = "test_key"
         assert conf["credentials"]["user"]["name"] == "test_user"
         assert conf["credentials"]["user"]["key"] == "test_key"
+
+    @use_proj_params
+    def test_merge_params(self, tmp_path):
+        """Make sure param config of env is merged with base."""
+        conf = OmegaConfLoader(str(tmp_path))
+        actual = conf["parameters"]
+        expected = {
+            "cross_validation": {
+                "max_evals": 128,
+                "grid": {
+                    "n_estimators": [250,750,1000,1100],
+                    "max_depth": [3,4,5,6],
+                    "learning_rate": [0.04,0.06,0.1,0.2],
+                    "min_child_weight": [1,3,5,10,15,60],
+                    "gamma": [0.001,0.01,0.1]
+                }
+            }
+        }
+
+        assert actual == expected
