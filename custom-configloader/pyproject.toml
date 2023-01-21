@@ -1,0 +1,21 @@
+[tool.kedro]
+package_name = "prototype"
+project_name = "prototype"
+project_version = "0.18.4"
+
+[tool.black]
+line-length = 79
+target-version = ['py38', 'py39', 'py310']
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+addopts = """
+--cov-report term-missing \
+--cov src/prototype -ra"""
+
+[tool.coverage.report]
+fail_under = 0
+show_missing = true
+exclude_lines = ["pragma: no cover", "raise NotImplementedError"]
