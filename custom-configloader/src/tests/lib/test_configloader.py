@@ -98,7 +98,13 @@ def proj_catalog_env_variable(tmp_path):
 def proj_credentials_env_variable(tmp_path):
     path = tmp_path / _DEFAULT_RUN_ENV / "credentials.yml"
     _write_yaml(
-        path, {"user": {"name": "${oc.env:TEST_USERNAME}", "key": "${oc.env:TEST_KEY}"}}
+        path,
+        {
+            "user": {
+                "name": "${oc.env:TEST_USERNAME}",
+                "key": "${oc.env:TEST_KEY}",
+            }
+        },
     )
 
 
@@ -109,21 +115,17 @@ def proj_params(tmp_path):
         "cross_validation": {
             "max_evals": 128,
             "grid": {
-                "n_estimators": [250,750,1000,1100],
-                "max_depth": [3,4,5,6],
-                "learning_rate": [0.04,0.06,0.1,0.2],
-                "min_child_weight": [1,3,5,10,15,60],
-            }
+                "n_estimators": [250, 750, 1000, 1100],
+                "max_depth": [3, 4, 5, 6],
+                "learning_rate": [0.04, 0.06, 0.1, 0.2],
+                "min_child_weight": [1, 3, 5, 10, 15, 60],
+            },
         }
     }
 
     run_env_path = tmp_path / _DEFAULT_RUN_ENV / "parameters.yaml"
     run_env_params = {
-        "cross_validation": {
-            "grid": {
-                "gamma": [0.001,0.01,0.1]
-            }
-        }
+        "cross_validation": {"grid": {"gamma": [0.001, 0.01, 0.1]}}
     }
     _write_yaml(base_path, base_params)
     _write_yaml(run_env_path, run_env_params)
@@ -134,7 +136,9 @@ use_proj_catalog = pytest.mark.usefixtures("proj_catalog")
 use_credentials_env_variable_yml = pytest.mark.usefixtures(
     "proj_credentials_env_variable"
 )
-use_catalog_env_variable_yml = pytest.mark.usefixtures("proj_catalog_env_variable")
+use_catalog_env_variable_yml = pytest.mark.usefixtures(
+    "proj_catalog_env_variable"
+)
 use_proj_params = pytest.mark.usefixtures("proj_params")
 
 
@@ -195,14 +199,20 @@ class TestOmegaConfLoader:
             r"Given configuration path either does not exist "
             r"or is not a valid directory\: {}"
         )
-        with pytest.raises(MissingConfigException, match=pattern.format(".*base")):
+        with pytest.raises(
+            MissingConfigException, match=pattern.format(".*base")
+        ):
             OmegaConfLoader(str(tmp_path))["catalog"]
-        with pytest.raises(MissingConfigException, match=pattern.format(".*local")):
+        with pytest.raises(
+            MissingConfigException, match=pattern.format(".*local")
+        ):
             proj_catalog = tmp_path / _BASE_ENV / "catalog.yml"
             _write_yaml(proj_catalog, base_config)
             OmegaConfLoader(str(tmp_path))["catalog"]
 
-    @pytest.mark.usefixtures("create_config_dir", "proj_catalog", "proj_catalog_nested")
+    @pytest.mark.usefixtures(
+        "create_config_dir", "proj_catalog", "proj_catalog_nested"
+    )
     def test_nested(self, tmp_path):
         """Test loading the config from subdirectories"""
         config_loader = OmegaConfLoader(str(tmp_path))
@@ -309,7 +319,9 @@ class TestOmegaConfLoader:
     def test_pattern_key_not_found(self, tmp_path):
         """Check the error if no config files satisfy a given pattern"""
         key = "non-existent-pattern"
-        pattern = f"No config patterns were found for '{key}' in your config loader"
+        pattern = (
+            f"No config patterns were found for '{key}' in your config loader"
+        )
         with pytest.raises(KeyError, match=pattern):
             OmegaConfLoader(str(tmp_path))[key]
 
@@ -348,9 +360,12 @@ class TestOmegaConfLoader:
             {"env": _BASE_ENV, "common": "common"},
         )
         _write_yaml(
-            tmp_path / "dev" / "catalog1.yml", {"env": "dev", "dev_specific": "wiz"}
+            tmp_path / "dev" / "catalog1.yml",
+            {"env": "dev", "dev_specific": "wiz"},
         )
-        _write_yaml(tmp_path / "dev" / "user1" / "catalog2.yml", {"user1_c2": True})
+        _write_yaml(
+            tmp_path / "dev" / "user1" / "catalog2.yml", {"user1_c2": True}
+        )
 
         catalog_patterns = {
             "catalog": [
@@ -362,7 +377,9 @@ class TestOmegaConfLoader:
         }
 
         catalog = OmegaConfLoader(
-            conf_source=str(tmp_path), env="dev", config_patterns=catalog_patterns
+            conf_source=str(tmp_path),
+            env="dev",
+            config_patterns=catalog_patterns,
         )["catalog"]
         expected_catalog = {
             "env": "dev",
@@ -439,7 +456,9 @@ class TestOmegaConfLoader:
         _write_yaml(base_mlflow, base_config)
         _write_yaml(local_mlflow, local_config)
 
-        conf = OmegaConfLoader(str(tmp_path), config_patterns=mlflow_patterns)["mlflow"]
+        conf = OmegaConfLoader(str(tmp_path), config_patterns=mlflow_patterns)[
+            "mlflow"
+        ]
 
         assert conf == {
             "tracking": {
@@ -487,12 +506,12 @@ class TestOmegaConfLoader:
             "cross_validation": {
                 "max_evals": 128,
                 "grid": {
-                    "n_estimators": [250,750,1000,1100],
-                    "max_depth": [3,4,5,6],
-                    "learning_rate": [0.04,0.06,0.1,0.2],
-                    "min_child_weight": [1,3,5,10,15,60],
-                    "gamma": [0.001,0.01,0.1]
-                }
+                    "n_estimators": [250, 750, 1000, 1100],
+                    "max_depth": [3, 4, 5, 6],
+                    "learning_rate": [0.04, 0.06, 0.1, 0.2],
+                    "min_child_weight": [1, 3, 5, 10, 15, 60],
+                    "gamma": [0.001, 0.01, 0.1],
+                },
             }
         }
 
