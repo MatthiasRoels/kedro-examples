@@ -1,15 +1,11 @@
-# import logging
-from copy import deepcopy
 from glob import iglob
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from omegaconf import OmegaConf, DictConfig
 from kedro.config import AbstractConfigLoader, MissingConfigException
 from yaml.parser import ParserError
 from yaml.scanner import ScannerError
-
-# _config_logger = logging.getLogger(__name__)
 
 
 class ConfigLoader(AbstractConfigLoader):
@@ -61,6 +57,7 @@ class ConfigLoader(AbstractConfigLoader):
         config_patterns: Dict[str, List[str]] = None,
         base_env: str = "base",
         default_run_env: str = "local",
+        globals_pattern: Optional[str] = None,
     ):
         """Instantiates a ``OmegaConfLoader``.
         Args:
@@ -75,6 +72,9 @@ class ConfigLoader(AbstractConfigLoader):
                 the configuration paths.
             default_run_env: Name of the default run environment. Defaults to `"local"`.
                 Can be overridden by supplying the `env` argument.
+            globals_pattern: Optional keyword-only argument specifying a glob
+                pattern. Files that match the pattern will be loaded as a
+                formatting dictionary.
         """
         self.base_env = base_env
         self.default_run_env = default_run_env
@@ -91,11 +91,16 @@ class ConfigLoader(AbstractConfigLoader):
         }
         self.config_patterns.update(config_patterns or {})
 
+        if globals_pattern:
+            self.config_patterns["globals"] = globals_pattern
+
         super().__init__(
             conf_source=conf_source,
             env=env,
             runtime_params=runtime_params,
         )
+
+        self.globals_conf = self._init_globals_conf()
 
     def __repr__(self):  # pragma: no cover
         return (
@@ -132,6 +137,9 @@ class ConfigLoader(AbstractConfigLoader):
                 f"No config patterns were found for '{key}' in your config loader"
             )
 
+        if key == "globals":
+            return OmegaConf.to_container(self.globals_conf, resolve=True)
+
         loaded_configs = [
             self._load_and_merge_dir_config(
                 conf_path, self.config_patterns[key]
@@ -143,7 +151,7 @@ class ConfigLoader(AbstractConfigLoader):
         merged_conf = self._merge_configs(loaded_configs, merge_strategy)
 
         # cast to dict and return
-        config = OmegaConf.to_container(merged_conf, resolve=True)
+        config = self._apply_resolvers(merged_conf, self.globals_conf)
 
         if not config:
             run_env = self.env or self.default_run_env
@@ -166,6 +174,24 @@ class ConfigLoader(AbstractConfigLoader):
             str(Path(self.conf_source) / self.base_env),
             str(Path(self.conf_source) / run_env),
         ]
+
+    def _init_globals_conf(self) -> DictConfig:
+        """Initialize the globals configuration
+
+        Returns:
+            DictConfig: globals configuration
+        """
+        if not "globals" in self.config_patterns:
+            return OmegaConf.create({})
+
+        loaded_configs = [
+            self._load_and_merge_dir_config(
+                conf_path, self.config_patterns["globals"]
+            )
+            for conf_path in self.conf_paths
+        ]
+
+        return self._merge_configs(loaded_configs)
 
     def _get_merge_strategy(self, conf_type: str) -> str:
         """Get merge strategy to merge DictConf objects.
@@ -286,6 +312,35 @@ class ConfigLoader(AbstractConfigLoader):
             final.update(overwrite_dict)
 
         return OmegaConf.create(final)
+
+    @staticmethod
+    def _apply_resolvers(
+        conf: DictConfig, globals_conf: DictConfig
+    ) -> Dict[str, Any]:
+        """Merge configuration with globals_conf to be able to apply
+        interpolation in the configuration with variables from globals.
+
+        Args:
+            conf (DictConfig): _description_
+            globals_conf (DictConfig): _description_
+
+        Returns:
+            Dict[str, Any]: _description_
+        """
+        if not globals_conf:
+            return OmegaConf.to_container(conf, resolve=True)
+
+        merged_conf = OmegaConf.merge(
+            OmegaConf.create({"globals": globals_conf}), conf
+        )
+
+        resolved_conf = OmegaConf.to_container(merged_conf, resolve=True)
+
+        # remove "globals" key from dict again as this is no longer required
+        # and not desired in the final result
+        _ = resolved_conf.pop("globals", None)
+
+        return resolved_conf
 
     @staticmethod
     def _check_duplicate_top_level_keys(
