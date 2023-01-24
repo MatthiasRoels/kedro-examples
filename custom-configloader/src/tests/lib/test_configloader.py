@@ -131,6 +131,23 @@ def proj_params(tmp_path):
     _write_yaml(run_env_path, run_env_params)
 
 
+@pytest.fixture
+def proj_catalog_globals(tmp_path):
+    catalog_path = tmp_path / _BASE_ENV / "catalog.yaml"
+    catalog = {
+        "cars": {
+            "type": "pandas.CSVDataSet",
+            "filepath": "${globals.catalog.base_filepath}cars.csv",
+            "save_args": {"index": True},
+        },
+    }
+
+    globals_path = tmp_path / _BASE_ENV / "globals.yaml"
+    globals_conf = {"catalog": {"base_filepath": "/data/catalog/"}}
+    _write_yaml(catalog_path, catalog)
+    _write_yaml(globals_path, globals_conf)
+
+
 use_config_dir = pytest.mark.usefixtures("create_config_dir")
 use_proj_catalog = pytest.mark.usefixtures("proj_catalog")
 use_credentials_env_variable_yml = pytest.mark.usefixtures(
@@ -140,6 +157,7 @@ use_catalog_env_variable_yml = pytest.mark.usefixtures(
     "proj_catalog_env_variable"
 )
 use_proj_params = pytest.mark.usefixtures("proj_params")
+use_proj_catalog_globals = pytest.mark.usefixtures("proj_catalog_globals")
 
 
 class TestOmegaConfLoader:
@@ -512,6 +530,34 @@ class TestOmegaConfLoader:
                     "min_child_weight": [1, 3, 5, 10, 15, 60],
                     "gamma": [0.001, 0.01, 0.1],
                 },
+            }
+        }
+
+        assert actual == expected
+
+    @use_proj_catalog_globals
+    def test_globals(self, tmp_path):
+        """Make sure globals are loaded properly"""
+        (tmp_path / _DEFAULT_RUN_ENV).mkdir(exist_ok=True)
+        globals_pattern = ["**/globals.yaml"]
+        conf = OmegaConfLoader(str(tmp_path), globals_pattern=globals_pattern)
+        actual = conf["globals"]
+        expected = {"catalog": {"base_filepath": "/data/catalog/"}}
+
+        assert actual == expected
+
+    @use_proj_catalog_globals
+    def test_interpolation_on_catalog(self, tmp_path):
+        """Make sure we can use templating with globals"""
+        (tmp_path / _DEFAULT_RUN_ENV).mkdir(exist_ok=True)
+        globals_pattern = ["**/globals.yaml"]
+        conf = OmegaConfLoader(str(tmp_path), globals_pattern=globals_pattern)
+        actual = conf["catalog"]
+        expected = {
+            "cars": {
+                "filepath": "/data/catalog/cars.csv",
+                "save_args": {"index": True},
+                "type": "pandas.CSVDataSet"
             }
         }
 
